@@ -22,7 +22,23 @@ force_auth = os.environ.get('EE_FORCE_AUTH', 'false').lower() in ('1', 'true', '
 # Use EE_PROJECT env var if set, otherwise fall back to the user's provided project id.
 # You can change this default or set EE_PROJECT in your environment.
 project_id = os.environ.get('EE_PROJECT', 'propane-library-477610-c3')
-ok = initialize_ee(force_auth=force_auth, project=project_id)
+
+# Try to read service account key from multiple sources:
+# 1. Environment variable (for Cloud Run / local dev with env var)
+# 2. Render secret file (Render secret files are mounted at /etc/secrets/)
+# 3. Local file (for local dev with sa-key.json in project folder)
+service_account_key = os.environ.get('EE_SERVICE_ACCOUNT_JSON')
+if not service_account_key:
+    # Try Render secret file path
+    if os.path.exists('/etc/secrets/sa-key.json'):
+        with open('/etc/secrets/sa-key.json', 'r') as f:
+            service_account_key = f.read()
+    # Try local file
+    elif os.path.exists('./sa-key.json'):
+        with open('./sa-key.json', 'r') as f:
+            service_account_key = f.read()
+
+ok = initialize_ee(force_auth=force_auth, project=project_id, service_account_key=service_account_key)
 if not ok:
     print(f"Warning: Earth Engine not initialized (project={project_id}). API endpoints will return an informative error until EE is authenticated.")
     print("To authenticate interactively run: python -c \"import ee; ee.Authenticate()\"")
